@@ -33,91 +33,7 @@ airfoil_name = input('\nEnter name for optimized airfoil: ','s');
 %% ------------------------------------------------------------
 % Flow configuration (LOCKED)
 %% ------------------------------------------------------------
-config.xfoil_path = ...
-"C:\Users\Joshua\Desktop\MATLAB\airfoil_nehamizer1\xfoil.exe";
-config.work_dir = pwd;
-config.Mach = 0.0;
-config.Ncrit = 4;
 
-Re_list = [150000 250000];
-
-%% ------------------------------------------------------------
-% Objective menu
-%% ------------------------------------------------------------
-fprintf('\nObjective modes:\n');
-fprintf(' 1 : Clmax only\n');
-fprintf(' 2 : Endurance only (Cl^(3/2)/Cd)\n');
-fprintf(' 3 : Dual (Endurance + Clmax)\n');
-
-mode = input('\nSelect objective mode: ');
-
-%% ------------------------------------------------------------
-% Build design vector
-%% ------------------------------------------------------------
-[x0, lb, ub, activeIdx] = build_design_vector(mode);
-
-fprintf('\nActive design variables:\n');
-disp(activeIdx');
-
-%% ------------------------------------------------------------
-% Baseline reference evaluation
-%% ------------------------------------------------------------
-End_ref = 0;
-Clmax_ref = inf;
-
-for Re = Re_list
-    config.Re = Re;
-    [params,~,ok] = xfoil_analysis(baseline, config, false);
-    if ~ok
-        error('Baseline XFOIL failed');
-    end
-    End_ref   = End_ref + params(10);
-    Clmax_ref = min(Clmax_ref, params(4));
-end
-End_ref = End_ref / numel(Re_list);
-
-fprintf('\nBaseline reference:\n');
-fprintf(' Avg endurance = %.4f\n', End_ref);
-fprintf(' Min Clmax     = %.4f\n', Clmax_ref);
-
-%% ------------------------------------------------------------
-% Optimization
-%% ------------------------------------------------------------
-opts = optimoptions('fmincon', ...
-    'Algorithm','sqp', ...
-    'Display','iter', ...
-    'MaxIterations',40, ...
-    'OptimalityTolerance',1e-4);
-
-[x_opt, ~] = fmincon( ...
- @(x) objective_dispatcher( ...
-        x, baseline, config, Re_list, ...
-        End_ref, Clmax_ref, mode), ...
- x0, [], [], [], [], lb, ub, [], opts);
-
-
-%% ------------------------------------------------------------
-% Build optimized airfoil
-%% ------------------------------------------------------------
-airfoil_opt = apply_design_vector(baseline, x_opt, config);
-
-%% ------------------------------------------------------------
-% Post-optimization evaluation (AUTHORITATIVE)
-%% ------------------------------------------------------------
-End_opt = 0;
-Clmax_opt = inf;
-
-for Re = Re_list
-    config.Re = Re;
-    [params,~,ok] = xfoil_analysis(airfoil_opt, config, false);
-    if ~ok
-        warning('Optimized airfoil failed XFOIL');
-        return;
-    end
-    End_opt   = End_opt + params(10);
-    Clmax_opt = min(Clmax_opt, params(4));
-end
-End_opt = End_opt / numel(Re_list);
 
 %% ------------------------------------------------------------
 % Improvement gate (CRITICAL)
@@ -180,3 +96,4 @@ outfile = fullfile(outdir, [airfoil_name '.dat']);
 save_airfoil_dat(outfile, airfoil_opt, airfoil_name);
 
 fprintf('\n✓ Optimized airfoil saved:\n%s\n', outfile);
+
